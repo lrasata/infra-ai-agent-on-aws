@@ -41,11 +41,31 @@ resource "aws_iam_role_policy" "agent_model_invocation" {
     Statement = [
       {
         Effect = "Allow"
-        Action = "bedrock:InvokeModel"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
         Resource = [
-          "arn:aws:bedrock:${var.aws_region}::inference-profile/${var.model}",
+          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.model}",
           "arn:aws:bedrock:*::foundation-model/*"
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = [
+          "bedrock:GetFoundationModel",
+          "bedrock:GetInferenceProfile",
+          "bedrock:ListInferenceProfiles"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeAgent",
+          "bedrock:InvokeAgentWithResponseStream"
+        ]
+        Resource = "*"
       }
     ]
   })
