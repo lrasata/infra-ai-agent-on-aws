@@ -1,0 +1,56 @@
+openapi: 3.0.0
+info:
+  title: Service Info API
+  version: 1.0.0
+  description: API to retrieve ownership and operational status for an internal service.
+paths:
+  /get-service-info:
+    get:
+      summary: Get service ownership and status
+      description: Returns the owning team, on-call contact, and current status for a given service.
+      operationId: getServiceInfo
+      parameters:
+        - name: service
+          in: query
+          required: true
+          description: The name of the service to look up (for example, payments or auth).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service information returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                    description: Whether the service was found.
+                  service:
+                    type: string
+                    description: The name of the service.
+                  owner:
+                    type: string
+                    description: The team that owns the service.
+                  on_call:
+                    type: string
+                    description: The on-call contact for the service.
+                  status:
+                    type: string
+                    description: The current operational status of the service.
+        '404':
+          description: Service not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                    example: false
+                  service:
+                    type: string
+                  message:
+                    type: string
+                    description: Explanation of why the service could not be found.

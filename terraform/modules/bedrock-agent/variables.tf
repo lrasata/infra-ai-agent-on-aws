@@ -22,3 +22,13 @@ variable "env" {
   description = "Deployment environment (e.g. dev, staging, prod)"
   type        = string
 }
+
+variable "action_groups" {
+  description = "Map of action groups to attach to the agent"
+  type = map(object({
+    lambda_arn     = string
+    description    = string
+    openapi_schema = string
+  }))
+  default = {}
+}

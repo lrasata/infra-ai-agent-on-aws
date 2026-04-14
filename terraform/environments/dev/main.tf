@@ -21,16 +21,6 @@ provider "aws" {
   }
 }
 
-module "bedrock_agent" {
-  source = "../../modules/bedrock-agent"
-
-  app_id             = var.app_id
-  region             = var.region
-  model              = var.model
-  agent_instructions = var.agent_instructions
-  env                = var.env
-}
-
 module "lambda_functions" {
   source = "../../modules/lambda_function"
 
@@ -48,4 +38,24 @@ module "lambda_functions" {
   runtime               = each.value.runtime
   iam_policy_statements = each.value.iam_policy_statements
 
+}
+
+module "bedrock_agent" {
+  source = "../../modules/bedrock-agent"
+
+  app_id             = var.app_id
+  region             = var.region
+  model              = var.model
+  agent_instructions = var.agent_instructions
+  env                = var.env
+
+  action_groups = {
+    ops_actions = {
+      lambda_arn     = module.lambda_functions["ops_get_service_info"].function_arn
+      description    = "Operations actions for getting service information"
+      openapi_schema = file("${path.module}/schemas/services_actions.yaml")
+    }
+  }
+
+  depends_on = [module.lambda_functions]
 }

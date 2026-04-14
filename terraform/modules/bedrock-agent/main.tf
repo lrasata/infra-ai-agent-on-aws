@@ -85,6 +85,52 @@ resource "aws_bedrockagent_agent" "this" {
   }
 }
 
+# Allow Bedrock agent to invoke each action group Lambda
+resource "aws_lambda_permission" "agent_invoke" {
+  for_each = var.action_groups
+
+  statement_id  = "AllowBedrockAgentInvoke-${each.key}"
+  action        = "lambda:InvokeFunction"
+  function_name = each.value.lambda_arn
+  principal     = "bedrock.amazonaws.com"
+  source_arn    = aws_bedrockagent_agent.this.agent_arn
+}
+
+# Allow the agent IAM role to call Lambda
+resource "aws_iam_role_policy" "agent_lambda_invoke" {
+  count = length(var.action_groups) > 0 ? 1 : 0
+
+  name = "${var.app_id}-${var.env}-lambda-invoke"
+  role = aws_iam_role.agent_iam_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["lambda:InvokeFunction"]
+      Resource = [for ag in var.action_groups : ag.lambda_arn]
+    }]
+  })
+}
+
+# Action groups
+resource "aws_bedrockagent_agent_action_group" "this" {
+  for_each = var.action_groups
+
+  agent_id          = aws_bedrockagent_agent.this.agent_id
+  agent_version     = "DRAFT"
+  action_group_name = each.key
+  description       = each.value.description
+
+  action_group_executor {
+    lambda = each.value.lambda_arn
+  }
+
+  api_schema {
+    payload = each.value.openapi_schema
+  }
+}
+
 # Agent alias pointing to the DRAFT version
 resource "aws_bedrockagent_agent_alias" "draft" {
   agent_id         = aws_bedrockagent_agent.this.agent_id
