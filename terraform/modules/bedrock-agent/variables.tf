@@ -3,7 +3,7 @@ variable "app_id" {
   type        = string
 }
 
-variable "aws_region" {
+variable "region" {
   description = "AWS region where resources will be deployed"
   type        = string
 }

@@ -18,7 +18,7 @@ resource "aws_iam_role" "agent_iam_role" {
             "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
           ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:agent/*"
+            "aws:SourceArn" = "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:agent/*"
           }
         }
       }
@@ -46,13 +46,13 @@ resource "aws_iam_role_policy" "agent_model_invocation" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
-          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.model}",
+          "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.model}",
           "arn:aws:bedrock:*::foundation-model/*"
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "bedrock:GetFoundationModel",
           "bedrock:GetInferenceProfile",
           "bedrock:ListInferenceProfiles"
@@ -73,10 +73,10 @@ resource "aws_iam_role_policy" "agent_model_invocation" {
 
 # Bedrock Agent
 resource "aws_bedrockagent_agent" "this" {
-  agent_name              = "${var.app_id}-${var.env}"
-  agent_resource_role_arn = aws_iam_role.agent_iam_role.arn
-  foundation_model        = var.model
-  instruction             = var.agent_instructions
+  agent_name                  = "${var.app_id}-${var.env}"
+  agent_resource_role_arn     = aws_iam_role.agent_iam_role.arn
+  foundation_model            = var.model
+  instruction                 = var.agent_instructions
   idle_session_ttl_in_seconds = 600
 
   tags = {

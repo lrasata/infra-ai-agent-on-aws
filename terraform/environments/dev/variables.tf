@@ -4,7 +4,7 @@ variable "app_id" {
   default     = "ai-agent-on-aws"
 }
 
-variable "aws_region" {
+variable "region" {
   description = "AWS region where resources will be deployed"
   type        = string
   default     = "eu-central-1"
