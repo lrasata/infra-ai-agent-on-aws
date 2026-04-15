@@ -130,6 +130,15 @@ resource "aws_bedrockagent_agent_action_group" "this" {
   api_schema {
     payload = each.value.openapi_schema
   }
+
+  # Bedrock rejects DELETE on an ENABLED action group. UpdateAgentActionGroup to DISABLED
+  # also requires the full schema, which isn't available in a destroy provisioner.
+  # Workaround: delete it ourselves with --skip-resource-in-use-check; Terraform's own
+  # subsequent delete call will get a 404 and treat it as success.
+  provisioner "local-exec" {
+    when    = destroy
+    command = "aws bedrock-agent delete-agent-action-group --agent-id ${self.agent_id} --agent-version DRAFT --action-group-id ${self.action_group_id} --skip-resource-in-use-check"
+  }
 }
 
 # Agent alias pointing to the DRAFT version
