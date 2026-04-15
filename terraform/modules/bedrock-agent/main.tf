@@ -121,6 +121,7 @@ resource "aws_bedrockagent_agent_action_group" "this" {
   agent_version     = "DRAFT"
   action_group_name = each.key
   description       = each.value.description
+  prepare_agent     = false
 
   action_group_executor {
     lambda = each.value.lambda_arn
@@ -132,9 +133,12 @@ resource "aws_bedrockagent_agent_action_group" "this" {
 }
 
 # Agent alias pointing to the DRAFT version
+# depends_on ensures PrepareAgent is only called once, after all action groups are registered
 resource "aws_bedrockagent_agent_alias" "draft" {
   agent_id         = aws_bedrockagent_agent.this.agent_id
   agent_alias_name = "draft"
+
+  depends_on = [aws_bedrockagent_agent_action_group.this]
 
   tags = {
     AppId       = var.app_id

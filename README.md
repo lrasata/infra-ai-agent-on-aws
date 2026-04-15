@@ -4,8 +4,49 @@ Terraform infrastructure for an AI Agent built with Amazon Bedrock.
 
 ## Source
 
-This project follows the LinkedIn Learning course:
+This project follows the *LinkedIn Learning course by Kesha on AI*:
 **AI Challenge: Build an AI Agent in 7 Steps in 7 Days with AWS**
+
+## How it works
+
+Amazon Bedrock is AWS's managed AI service. It lets you run a large language model (like Claude or Amazon Nova) without managing any servers. On top of that, **Bedrock Agents** adds the ability for the model to take actions — not just answer questions, but actually call your own code to fetch real data and return it as part of the response.
+
+This project sets up one such agent. When you ask it something, it figures out whether it needs to look something up, calls the right Lambda function, and weaves the result into its answer.
+
+### Action group: ServicesActions
+
+An action group is how you teach the agent what it can do. Think of it as a plugin — it tells the agent: "if you need to look up a service, here's the API you can call."
+
+This project has one action group called **ServicesActions**. When the agent receives a question about an internal service (e.g. "who owns the payments service?"), it:
+
+1. Recognises it needs service information
+2. Calls the `ops_get_service_info` Lambda function
+3. Passes the service name as a parameter
+4. Gets back the owner, on-call contact, and current status
+5. Returns a natural-language answer to the user
+
+The Lambda function is defined in `terraform/src/lambda_functions/ops_get_service_info/` and currently knows about two services: `payments` and `auth`.
+
+The contract between the agent and the Lambda (what parameters to send, what response to expect) is defined by an OpenAPI schema at `terraform/environments/dev/schemas/services_actions.yaml`.
+
+### How the pieces connect
+
+```
+User prompt
+    │
+    ▼
+Bedrock Agent  ──── reads instructions + OpenAPI schema
+    │
+    │  calls when service info is needed
+    ▼
+Lambda: ops_get_service_info
+    │
+    ▼
+Returns owner / on-call / status
+    │
+    ▼
+Agent composes final answer
+```
 
 ## Structure
 
@@ -14,14 +55,25 @@ terraform/
 ├── environments/
 │   └── dev/
 │       ├── main.tf
+│       ├── locals.tf          # Lambda configs
 │       ├── variables.tf
 │       ├── outputs.tf
-│       └── terraform.tfvars
+│       ├── terraform.tfvars
+│       └── schemas/
+│           └── services_actions.yaml   # OpenAPI schema for the action group
 └── modules/
-    └── bedrock-agent/
+    ├── bedrock-agent/
+    │   ├── main.tf            # Agent, action group, IAM roles
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── lambda_function/
         ├── main.tf
         ├── variables.tf
         └── outputs.tf
+terraform/src/
+└── lambda_functions/
+    └── ops_get_service_info/
+        └── ops_get_service_info.py    # The actual Lambda code
 ```
 
 ## Variables
@@ -45,7 +97,47 @@ terraform apply -var-file="terraform.tfvars"
 
 ## Testing
 
-After `terraform apply`, prepare the agent before invoking it:
+### 1. Test the Lambda in isolation
+
+Before involving the agent, confirm the Lambda works on its own. In the AWS Console, go to the `ops-get-service-info` Lambda → Test, and use this payload:
+
+```json
+{
+  "actionGroup": "ServicesActions",
+  "apiPath": "/get-service-info",
+  "httpMethod": "GET",
+  "parameters": [
+    { "name": "service", "type": "string", "value": "payments" }
+  ],
+  "sessionAttributes": {},
+  "promptSessionAttributes": {}
+}
+```
+
+The response should include `owner`, `on_call`, and `status`. If this fails, the bug is in the Lambda — no need to involve the agent yet.
+
+### 2. Test the agent via the AWS Console
+
+Open the agent in the Bedrock console → Test panel. Try these prompts:
+
+- `"Who owns the payments service?"` — should trigger the action group
+- `"What's the status of auth?"` — different service, same action
+- `"What's the weather like?"` — should **not** trigger the action group
+
+Enable **Trace** in the test panel to see the agent's reasoning: which action it chose, what parameters it extracted, and what the Lambda returned. This is the most useful debugging tool.
+
+### What to check
+
+| What to check                               | Why it matters                                        |
+|---------------------------------------------|-------------------------------------------------------|
+| Did the agent call the Lambda?              | Confirms the OpenAPI schema is understood             |
+| Did it pass the right service name?         | Confirms parameter extraction from natural language   |
+| Did it use the Lambda response in its reply?| Confirms response parsing works                       |
+| Did it skip Lambda for unrelated questions? | Confirms the agent doesn't over-trigger               |
+
+### 3. Test via CLI
+
+After `terraform apply`, prepare the agent if needed:
 
 ```bash
 aws bedrock-agent prepare-agent \
@@ -60,7 +152,8 @@ aws bedrock-agent-runtime invoke-agent \
   --agent-id <agent_id> \
   --agent-alias-id <agent_alias_id> \
   --session-id my-test-session-001 \
-  --input-text "Hello, what can you do?" \
+  --input-text "Who owns the payments service?" \
+  --enable-trace \
   --region eu-central-1 \
   output.txt
 ```
