@@ -23,6 +23,7 @@ override.tf.json
 
 # IDE
 .idea/
+*.iml
 .vscode/
 
 # OS

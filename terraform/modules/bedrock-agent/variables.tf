@@ -23,6 +23,18 @@ variable "env" {
   type        = string
 }
 
+variable "enable_memory" {
+  description = "Enable SESSION_SUMMARY memory so the agent can recall context across sessions"
+  type        = bool
+  default     = false
+}
+
+variable "memory_storage_days" {
+  description = "Number of days to retain agent memory (1–365). Only used when enable_memory is true"
+  type        = number
+  default     = 30
+}
+
 variable "action_groups" {
   description = "Map of action groups to attach to the agent"
   type = map(object({

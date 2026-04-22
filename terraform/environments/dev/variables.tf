@@ -27,3 +27,9 @@ variable "env" {
   type        = string
   default     = "dev"
 }
+
+variable "enable_memory" {
+  description = "Enable SESSION_SUMMARY memory so the agent can recall context across sessions"
+  type        = bool
+  default     = false
+}

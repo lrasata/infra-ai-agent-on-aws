@@ -79,6 +79,14 @@ resource "aws_bedrockagent_agent" "this" {
   instruction                 = var.agent_instructions
   idle_session_ttl_in_seconds = 600
 
+  dynamic "memory_configuration" {
+    for_each = var.enable_memory ? [1] : []
+    content {
+      enabled_memory_types = ["SESSION_SUMMARY"]
+      storage_days         = var.memory_storage_days
+    }
+  }
+
   tags = {
     AppId       = var.app_id
     Environment = var.env
