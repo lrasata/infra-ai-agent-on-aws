@@ -149,6 +149,34 @@ resource "aws_bedrockagent_agent_action_group" "this" {
   }
 }
 
+# Allow the agent to query the knowledge base
+resource "aws_iam_role_policy" "agent_kb_retrieve" {
+  count = var.knowledge_base_arn != null ? 1 : 0
+
+  name = "${var.app_id}-${var.env}-kb-retrieve"
+  role = aws_iam_role.agent_iam_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["bedrock:Retrieve"]
+      Resource = var.knowledge_base_arn
+    }]
+  })
+}
+
+# Associate the knowledge base with the agent
+resource "aws_bedrockagent_agent_knowledge_base_association" "this" {
+  count = var.knowledge_base_id != null ? 1 : 0
+
+  agent_id             = aws_bedrockagent_agent.this.agent_id
+  agent_version        = "DRAFT"
+  knowledge_base_id    = var.knowledge_base_id
+  knowledge_base_state = "ENABLED"
+  description          = "S3-backed knowledge base for RAG"
+}
+
 # Agent alias pointing to the DRAFT version
 # depends_on ensures PrepareAgent is only called once, after all action groups are registered
 resource "aws_bedrockagent_agent_alias" "draft" {

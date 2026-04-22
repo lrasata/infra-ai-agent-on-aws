@@ -13,6 +13,14 @@ Amazon Bedrock is AWS's managed AI service. It lets you run a large language mod
 
 This project sets up one such agent. When you ask it something, it figures out whether it needs to look something up, calls the right Lambda function, and weaves the result into its answer.
 
+### Session memory
+
+The agent is configured with **SESSION_SUMMARY** memory. After each session ends, Bedrock automatically generates a summary of what was discussed and stores it. On the next session, the agent can recall that context — so it remembers things like which service the user was investigating or what was already checked.
+
+Memory is opt-in via the `enable_memory` variable in the `bedrock-agent` module (default: `false`). Set it to `true` in the environment's `main.tf` to activate it. You can also control how long summaries are retained with `memory_storage_days` (default: 30, max: 365).
+
+To test memory across sessions, use two separate `--session-id` values — the first to build context, the second to verify the agent recalls it.
+
 ### Action group: ServicesActions
 
 An action group is how you teach the agent what it can do. Think of it as a plugin — it tells the agent: "if you need to look up a service, here's the API you can call."

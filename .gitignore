@@ -31,3 +31,6 @@ override.tf.json
 Thumbs.db
 
 **/*.zip
+
+# AI
+.claude

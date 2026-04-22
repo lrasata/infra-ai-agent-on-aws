@@ -1,0 +1,20 @@
+Escalation Policy
+
+Severity levels determine when and how incidents are escalated.
+
+Severity 1:
+- Customer-facing outage
+- Immediate escalation required
+- Page the on-call engineer and notify the service owner
+
+Severity 2:
+- Degraded performance or partial outage
+- Notify the owning team
+- Escalate if not resolved within 30 minutes
+
+Severity 3:
+- Minor issue with no customer impact
+- Track during business hours
+- No immediate escalation required
+
+If the primary on-call engineer does not respond within 10 minutes, escalate to the secondary on-call or team lead.

@@ -1,0 +1,19 @@
+Incident Response Playbook
+
+An incident is any event that disrupts or degrades a production service.
+
+Incident response follows four phases:
+
+1. Detect and Triage
+Identify the issue, determine severity, and confirm whether customer impact exists.
+
+2. Mitigate
+Stabilize the system by rolling back changes, scaling resources, or applying temporary fixes.
+
+3. Communicate
+Notify stakeholders, update status pages, and keep impacted teams informed.
+
+4. Resolve and Review
+Fully resolve the issue and conduct a post-incident review to identify root cause and follow-up actions.
+
+For high-severity incidents, mitigation and communication should happen in parallel.

@@ -1,0 +1,13 @@
+Service Overview
+
+Payments Service:
+- Handles payment processing and transaction validation
+- Owned by the Payments Team
+- Critical for customer checkout flows
+
+Authentication Service:
+- Manages user login and identity verification
+- Owned by the Identity Team
+- Required for access to most customer-facing services
+
+For all services, ownership includes responsibility for uptime, on-call support, and incident resolution.

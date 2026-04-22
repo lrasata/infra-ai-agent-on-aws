@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.27"
     }
   }
 }
@@ -40,6 +40,25 @@ module "lambda_functions" {
 
 }
 
+module "s3" {
+  source = "../../modules/s3"
+
+  environment                = var.env
+  knowledge_base_bucket_name = var.knowledge_base_bucket_name
+}
+
+module "knowledge_base" {
+  source = "../../modules/knowledge-base"
+
+  app_id     = var.app_id
+  env        = var.env
+  region     = var.region
+  bucket_arn = module.s3.uploads_bucket_arn
+  bucket_id  = module.s3.uploads_bucket_id
+
+  depends_on = [module.s3]
+}
+
 module "bedrock_agent" {
   source = "../../modules/bedrock-agent"
 
@@ -49,6 +68,9 @@ module "bedrock_agent" {
   agent_instructions = var.agent_instructions
   env                = var.env
 
+  knowledge_base_id  = module.knowledge_base.knowledge_base_id
+  knowledge_base_arn = module.knowledge_base.knowledge_base_arn
+
   action_groups = {
     ops_actions = {
       lambda_arn     = module.lambda_functions["ops_get_service_info"].function_arn
@@ -57,5 +79,5 @@ module "bedrock_agent" {
     }
   }
 
-  depends_on = [module.lambda_functions]
+  depends_on = [module.lambda_functions, module.knowledge_base]
 }

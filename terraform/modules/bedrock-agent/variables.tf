@@ -35,6 +35,18 @@ variable "memory_storage_days" {
   default     = 30
 }
 
+variable "knowledge_base_id" {
+  description = "ID of the Bedrock Knowledge Base to associate with the agent. Leave null to skip."
+  type        = string
+  default     = null
+}
+
+variable "knowledge_base_arn" {
+  description = "ARN of the Bedrock Knowledge Base (used to grant the agent Retrieve permissions)."
+  type        = string
+  default     = null
+}
+
 variable "action_groups" {
   description = "Map of action groups to attach to the agent"
   type = map(object({

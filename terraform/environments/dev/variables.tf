@@ -33,3 +33,8 @@ variable "enable_memory" {
   type        = bool
   default     = false
 }
+
+variable "knowledge_base_bucket_name" {
+  description = "Base name for the uploads S3 bucket"
+  type        = string
+}
