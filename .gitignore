@@ -8,6 +8,9 @@
 *.tfvars
 *.tfvars.json
 
+# Local backend config (contains account-specific values, never commit)
+backend.hcl
+
 # Crash logs
 crash.log
 crash.*.log

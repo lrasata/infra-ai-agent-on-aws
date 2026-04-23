@@ -13,7 +13,7 @@ output "data_source_id" {
   value       = aws_bedrockagent_data_source.s3.data_source_id
 }
 
-output "collection_arn" {
-  description = "The ARN of the OpenSearch Serverless collection"
-  value       = aws_opensearchserverless_collection.this.arn
+output "vector_bucket_arn" {
+  description = "The ARN of the S3 vector bucket storing the embeddings"
+  value       = aws_s3vectors_vector_bucket.s3vectors_bucket.vector_bucket_arn
 }

@@ -36,15 +36,13 @@ variable "memory_storage_days" {
 }
 
 variable "knowledge_base_id" {
-  description = "ID of the Bedrock Knowledge Base to associate with the agent. Leave null to skip."
+  description = "ID of the Bedrock Knowledge Base to associate with the agent"
   type        = string
-  default     = null
 }
 
 variable "knowledge_base_arn" {
-  description = "ARN of the Bedrock Knowledge Base (used to grant the agent Retrieve permissions)."
+  description = "ARN of the Bedrock Knowledge Base (used to grant the agent Retrieve permissions)"
   type        = string
-  default     = null
 }
 
 variable "action_groups" {

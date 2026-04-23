@@ -1,10 +1,17 @@
 terraform {
   required_version = ">= 1.5"
 
+  # Backend values are passed via -backend-config in CI and locally via backend.hcl
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.27"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
     }
   }
 }

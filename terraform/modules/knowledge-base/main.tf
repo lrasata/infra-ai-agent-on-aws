@@ -7,12 +7,12 @@ locals {
 
 # ── S3 Vector bucket (stores the embeddings) ─────────────────────────────────
 
-resource "aws_s3vectors_vector_bucket" "this" {
+resource "aws_s3vectors_vector_bucket" "s3vectors_bucket" {
   vector_bucket_name = local.vector_bucket_name
 }
 
-resource "aws_s3vectors_index" "this" {
-  vector_bucket_name = aws_s3vectors_vector_bucket.this.vector_bucket_name
+resource "aws_s3vectors_index" "s3vectors_index" {
+  vector_bucket_name = aws_s3vectors_vector_bucket.s3vectors_bucket.vector_bucket_name
   index_name         = local.index_name
   data_type          = "float32"
   dimension          = var.embedding_dimensions
@@ -75,8 +75,8 @@ resource "aws_iam_role_policy" "knowledge_base" {
         Effect = "Allow"
         Action = ["s3vectors:*"]
         Resource = [
-          aws_s3vectors_vector_bucket.this.arn,
-          "${aws_s3vectors_vector_bucket.this.arn}/index/*",
+          aws_s3vectors_vector_bucket.s3vectors_bucket.vector_bucket_arn,
+          "${aws_s3vectors_vector_bucket.s3vectors_bucket.vector_bucket_arn}/index/*",
         ]
       }
     ]
@@ -99,7 +99,7 @@ resource "aws_bedrockagent_knowledge_base" "this" {
   storage_configuration {
     type = "S3_VECTORS"
     s3_vectors_configuration {
-      index_arn = aws_s3vectors_index.this.arn
+      index_arn = aws_s3vectors_index.s3vectors_index.index_arn
     }
   }
 

@@ -151,8 +151,6 @@ resource "aws_bedrockagent_agent_action_group" "this" {
 
 # Allow the agent to query the knowledge base
 resource "aws_iam_role_policy" "agent_kb_retrieve" {
-  count = var.knowledge_base_arn != null ? 1 : 0
-
   name = "${var.app_id}-${var.env}-kb-retrieve"
   role = aws_iam_role.agent_iam_role.id
 
@@ -168,8 +166,6 @@ resource "aws_iam_role_policy" "agent_kb_retrieve" {
 
 # Associate the knowledge base with the agent
 resource "aws_bedrockagent_agent_knowledge_base_association" "this" {
-  count = var.knowledge_base_id != null ? 1 : 0
-
   agent_id             = aws_bedrockagent_agent.this.agent_id
   agent_version        = "DRAFT"
   knowledge_base_id    = var.knowledge_base_id
@@ -177,13 +173,38 @@ resource "aws_bedrockagent_agent_knowledge_base_association" "this" {
   description          = "S3-backed knowledge base for RAG"
 }
 
+# The KB association triggers a PrepareAgent call internally but doesn't wait for it to finish.
+# Poll until the agent leaves PREPARING state before creating the alias.
+resource "null_resource" "wait_agent_ready" {
+  triggers = {
+    kb_association = aws_bedrockagent_agent_knowledge_base_association.this.knowledge_base_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      while true; do
+        STATUS=$(aws bedrock-agent get-agent \
+          --agent-id ${aws_bedrockagent_agent.this.agent_id} \
+          --region ${var.region} \
+          --query 'agent.agentStatus' \
+          --output text 2>/dev/null)
+        [ "$STATUS" != "PREPARING" ] && break
+        sleep 5
+      done
+    EOT
+  }
+}
+
 # Agent alias pointing to the DRAFT version
-# depends_on ensures PrepareAgent is only called once, after all action groups are registered
 resource "aws_bedrockagent_agent_alias" "draft" {
   agent_id         = aws_bedrockagent_agent.this.agent_id
   agent_alias_name = "draft"
 
-  depends_on = [aws_bedrockagent_agent_action_group.this]
+  depends_on = [
+    aws_bedrockagent_agent_action_group.this,
+    null_resource.wait_agent_ready,
+  ]
 
   tags = {
     AppId       = var.app_id
