@@ -66,6 +66,52 @@ module "knowledge_base" {
   depends_on = [module.s3]
 }
 
+module "kb_sync_lambda" {
+  source = "../../modules/lambda_function"
+
+  environment  = var.env
+  app_id       = var.app_id
+  lambda_name  = "kb-sync"
+  source_dir   = "${path.module}/../../src/lambda_functions/kb_sync"
+  handler_file = "kb_sync.lambda_handler"
+  runtime      = "python3.11"
+  timeout      = 60
+
+  environment_vars = {
+    KNOWLEDGE_BASE_ID = module.knowledge_base.knowledge_base_id
+    DATA_SOURCE_ID    = module.knowledge_base.data_source_id
+  }
+
+  iam_policy_statements = [
+    {
+      Effect   = "Allow"
+      Action   = ["bedrock:StartIngestionJob"]
+      Resource = module.knowledge_base.knowledge_base_arn
+    }
+  ]
+
+  depends_on = [module.knowledge_base]
+}
+
+resource "aws_lambda_permission" "allow_s3_invoke_kb_sync" {
+  statement_id  = "AllowS3InvokeKbSync"
+  action        = "lambda:InvokeFunction"
+  function_name = module.kb_sync_lambda.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = module.s3.uploads_bucket_arn
+}
+
+resource "aws_s3_bucket_notification" "kb_sync" {
+  bucket = module.s3.uploads_bucket_id
+
+  lambda_function {
+    lambda_function_arn = module.kb_sync_lambda.function_arn
+    events              = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_lambda_permission.allow_s3_invoke_kb_sync]
+}
+
 module "bedrock_agent" {
   source = "../../modules/bedrock-agent"
 

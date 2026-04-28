@@ -11,7 +11,37 @@ This project follows the *LinkedIn Learning course by Kesha on AI*:
 
 Amazon Bedrock is AWS's managed AI service. It lets you run a large language model (like Claude or Amazon Nova) without managing any servers. On top of that, **Bedrock Agents** adds the ability for the model to take actions — not just answer questions, but actually call your own code to fetch real data and return it as part of the response.
 
-This project sets up one such agent. When you ask it something, it figures out whether it needs to look something up, calls the right Lambda function, and weaves the result into its answer.
+This project sets up one such agent. When you ask it something, it can look up information from a connected knowledge base, call Lambda functions to fetch live data, and weave everything into its answer.
+
+### Knowledge base
+
+The agent is connected to a **Bedrock Knowledge Base** backed by an S3 bucket. Any documents you upload to that bucket are automatically chunked, embedded, and indexed — the agent can then answer questions grounded in their content.
+
+**Automatic ingestion** is wired up via an S3 event notification: uploading a file triggers a Lambda (`kb-sync`) that starts a Bedrock ingestion job. The agent sees the new content once the job finishes (typically within a minute or two).
+
+#### Sample documents
+
+The `data/` folder contains three files you can upload to the S3 bucket to test the knowledge base:
+
+| File | Content |
+|------|---------|
+| `escalation_policy.txt` | Severity levels and escalation rules for on-call incidents |
+| `incident_playbook.txt` | Four-phase incident response process |
+| `service_overview.txt` | Ownership and responsibilities for the Payments and Auth services |
+
+Upload them via the AWS Console or CLI:
+
+```bash
+aws s3 cp data/ s3://<your-kb-bucket-name>/ --recursive
+```
+
+Once ingestion completes, try these questions against the agent:
+
+- `"How should severity 3 issues be escalated?"`
+- `"What are the four phases of incident response?"`
+- `"What happens if the on-call engineer doesn't respond within 10 minutes?"`
+- `"What is the payments service responsible for?"`
+- `"What should I do first when a production incident occurs?"`
 
 ### Session memory
 
@@ -45,12 +75,18 @@ User prompt
     ▼
 Bedrock Agent  ──── reads instructions + OpenAPI schema
     │
-    │  calls when service info is needed
-    ▼
-Lambda: ops_get_service_info
+    ├── searches knowledge base (RAG)
+    │       │
+    │       ▼
+    │   Knowledge Base ◄── S3 bucket ◄── kb-sync Lambda ◄── S3 upload event
     │
-    ▼
-Returns owner / on-call / status
+    └── calls when service info is needed
+            │
+            ▼
+        Lambda: ops_get_service_info
+            │
+            ▼
+        Returns owner / on-call / status
     │
     ▼
 Agent composes final answer
@@ -59,6 +95,10 @@ Agent composes final answer
 ## Structure
 
 ```
+data/                                          # Sample documents for the knowledge base
+├── escalation_policy.txt
+├── incident_playbook.txt
+└── service_overview.txt
 terraform/
 ├── environments/
 │   └── dev/
@@ -74,14 +114,24 @@ terraform/
     │   ├── main.tf            # Agent, action group, IAM roles
     │   ├── variables.tf
     │   └── outputs.tf
+    ├── knowledge-base/
+    │   ├── main.tf            # KB, S3 data source, S3 vectors index, IAM roles
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── s3/
+    │   ├── main.tf            # KB documents bucket
+    │   ├── variables.tf
+    │   └── outputs.tf
     └── lambda_function/
         ├── main.tf
         ├── variables.tf
         └── outputs.tf
 terraform/src/
 └── lambda_functions/
-    └── ops_get_service_info/
-        └── ops_get_service_info.py    # The actual Lambda code
+    ├── ops_get_service_info/
+    │   └── ops_get_service_info.py    # Action group Lambda
+    └── kb_sync/
+        └── kb_sync.py                 # Triggers KB ingestion on S3 upload
 ```
 
 ## Variables
@@ -124,7 +174,34 @@ Before involving the agent, confirm the Lambda works on its own. In the AWS Cons
 
 The response should include `owner`, `on_call`, and `status`. If this fails, the bug is in the Lambda — no need to involve the agent yet.
 
-### 2. Test the agent via the AWS Console
+### 2. Test the knowledge base
+
+Upload the sample documents and wait for ingestion to complete:
+
+```bash
+aws s3 cp data/ s3://<your-kb-bucket-name>/ --recursive
+```
+
+You can monitor the ingestion job status in the AWS Console under **Bedrock > Knowledge Bases > Data sources > Sync history**, or via CLI:
+
+```bash
+aws bedrock-agent list-ingestion-jobs \
+  --knowledge-base-id <knowledge_base_id> \
+  --data-source-id <data_source_id> \
+  --region eu-central-1
+```
+
+Once the job shows `COMPLETE`, ask the agent questions about the uploaded content:
+
+- `"How should severity 3 issues be escalated?"`
+- `"What are the four phases of incident response?"`
+- `"What happens if the on-call engineer doesn't respond within 10 minutes?"`
+- `"What is the payments service responsible for?"`
+- `"What should I do first when a production incident occurs?"`
+
+Enable **Trace** in the test panel to confirm the agent is retrieving chunks from the knowledge base and not hallucinating answers.
+
+### 3. Test the agent via the AWS Console (action group)
 
 Open the agent in the Bedrock console → Test panel. Try these prompts:
 
@@ -143,7 +220,7 @@ Enable **Trace** in the test panel to see the agent's reasoning: which action it
 | Did it use the Lambda response in its reply?| Confirms response parsing works                       |
 | Did it skip Lambda for unrelated questions? | Confirms the agent doesn't over-trigger               |
 
-### 3. Test via CLI
+### 4. Test via CLI
 
 After `terraform apply`, prepare the agent if needed:
 
