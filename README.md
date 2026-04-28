@@ -81,6 +81,21 @@ The Lambda function is defined in `terraform/src/lambda_functions/ops_get_servic
 
 The contract between the agent and the Lambda (what parameters to send, what response to expect) is defined by an OpenAPI schema at `terraform/environments/dev/schemas/services_actions.yaml`.
 
+### Observability: model invocation logging
+
+Every request the agent processes is logged to **CloudWatch Logs** via Bedrock's model invocation logging feature. This includes text input/output, embeddings, and image data — giving you full visibility into what the agent received, what it returned, and which tools it used.
+
+The logging stack consists of:
+
+| Resource | Purpose |
+|----------|---------|
+| CloudWatch Log Group (`ops-assistant-dev-bedrock-logs`) | Receives all Bedrock model invocation log events |
+| IAM Policy (`BedrockLogsPolicy`) | Grants Bedrock `logs:CreateLogStream` and `logs:PutLogEvents` |
+| IAM Role (`<app_id>-<env>-bedrock-logs-role`) | Assumed by `bedrock.amazonaws.com` to write logs |
+| `aws_bedrock_model_invocation_logging_configuration` | Enables logging and points it at the log group + role |
+
+Logs are retained for **7 days** (configurable via the `retention_days` variable in the module).
+
 ### How the pieces connect
 
 ```
@@ -140,6 +155,10 @@ terraform/
     │   └── outputs.tf
     ├── s3/
     │   ├── main.tf            # KB documents bucket
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── bedrock-logging/
+    │   ├── main.tf            # CloudWatch log group, IAM role/policy, invocation logging config
     │   ├── variables.tf
     │   └── outputs.tf
     └── lambda_function/
@@ -285,7 +304,64 @@ The last prompt should return a `statusCode: 200` but with `agentResponse` conta
 
 To reuse an existing conversation and test session memory, call the Lambda again with the **same `sessionId`** — the agent will recall what was discussed earlier in that session.
 
-### 5. Test via CLI
+### 5. Review logs in CloudWatch
+
+There are two separate log groups — they capture different things:
+
+| Log group | What it contains |
+|-----------|-----------------|
+| `/aws/lambda/dev-ops-assistant-invoke-agent-lambda` | Lambda execution logs: Python stdout, `logger.info` trace keys, boto3 errors |
+| `ops-assistant-dev-bedrock-logs` | Bedrock model invocation logs: raw prompt/response, guardrail decisions, model ID |
+
+#### Lambda execution logs (invocation flow and errors)
+
+Go to **CloudWatch → Log groups → `/aws/lambda/dev-ops-assistant-invoke-agent-lambda`**, then open the most recent log stream.
+
+Or via CLI:
+
+```bash
+aws logs tail /aws/lambda/dev-ops-assistant-invoke-agent-lambda \
+  --region eu-central-1 \
+  --follow
+```
+
+This is the first place to check when the Lambda returns an error or an unexpected response.
+
+#### Bedrock model invocation logs (what the model saw and returned)
+
+Go to **CloudWatch → Log groups → `ops-assistant-dev-bedrock-logs`**, then open the log stream `aws/bedrock/modelinvocations`.
+
+Or via CLI:
+
+```bash
+# List available log streams
+aws logs describe-log-streams --log-group-name ops-assistant-dev-bedrock-logs --region eu-central-1
+
+# Read the most recent invocation events
+aws logs get-log-events \
+  --log-group-name ops-assistant-dev-bedrock-logs \
+  --log-stream-name aws/bedrock/modelinvocations \
+  --region eu-central-1 \
+  --limit 20
+```
+
+**Key fields in each Bedrock log event:**
+
+| Field | Description |
+|-------|-------------|
+| `input.inputBodyJson.inputText` | The prompt sent to the model |
+| `output.outputBodyJson.completion` | The model's response text |
+| `modelId` | The foundation model that handled the request |
+| `requestId` | Unique ID — correlate with the `trace` returned by the `invoke-agent` Lambda |
+| `guardrailAction` | `NONE` for allowed prompts, `BLOCKED` when a guardrail fired |
+
+**What to look for:**
+
+- `guardrailAction: "BLOCKED"` on a credentials prompt confirms the denied-topic guardrail is working
+- Missing `output` fields on a failed call point to an IAM or model access issue
+- Use the Lambda logs to find the `requestId`, then search for it in the Bedrock logs to see the full model interaction for that specific call
+
+### 6. Test via CLI
 
 After `terraform apply`, prepare the agent if needed:
 

@@ -28,6 +28,14 @@ provider "aws" {
   }
 }
 
+module "bedrock_logging" {
+  source = "../../modules/bedrock-logging"
+
+  app_id = var.app_id
+  env    = var.env
+  region = var.region
+}
+
 module "lambda_functions" {
   source = "../../modules/lambda_function"
 
