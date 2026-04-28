@@ -45,6 +45,18 @@ variable "knowledge_base_arn" {
   type        = string
 }
 
+variable "guardrail_id" {
+  description = "ID of the Bedrock guardrail to attach to the agent. Leave empty to disable."
+  type        = string
+  default     = ""
+}
+
+variable "guardrail_version" {
+  description = "Version of the Bedrock guardrail to enforce. Required when guardrail_id is set."
+  type        = string
+  default     = ""
+}
+
 variable "action_groups" {
   description = "Map of action groups to attach to the agent"
   type = map(object({

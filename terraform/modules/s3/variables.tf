@@ -11,5 +11,4 @@ variable "knowledge_base_bucket_name" {
 variable "app_id" {
   description = "Application identifier for tagging resources"
   type        = string
-  default     = ""
 }

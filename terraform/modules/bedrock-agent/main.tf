@@ -87,6 +87,14 @@ resource "aws_bedrockagent_agent" "this" {
     }
   }
 
+  dynamic "guardrail_configuration" {
+    for_each = var.guardrail_id != "" ? [1] : []
+    content {
+      guardrail_identifier = var.guardrail_id
+      guardrail_version    = var.guardrail_version
+    }
+  }
+
   tags = {
     AppId       = var.app_id
     Environment = var.env
@@ -147,6 +155,23 @@ resource "aws_bedrockagent_agent_action_group" "this" {
     when    = destroy
     command = "aws bedrock-agent delete-agent-action-group --agent-id ${self.agent_id} --agent-version DRAFT --action-group-id ${self.action_group_id} --skip-resource-in-use-check"
   }
+}
+
+# Allow the agent to apply the guardrail during inference
+resource "aws_iam_role_policy" "agent_guardrail" {
+  count = var.guardrail_id != "" ? 1 : 0
+
+  name = "${var.app_id}-${var.env}-guardrail"
+  role = aws_iam_role.agent_iam_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["bedrock:ApplyGuardrail"]
+      Resource = "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:guardrail/${var.guardrail_id}"
+    }]
+  })
 }
 
 # Allow the agent to query the knowledge base

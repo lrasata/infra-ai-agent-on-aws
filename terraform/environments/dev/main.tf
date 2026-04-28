@@ -51,6 +51,7 @@ module "s3" {
   source = "../../modules/s3"
 
   environment                = var.env
+  app_id                     = var.app_id
   knowledge_base_bucket_name = var.knowledge_base_bucket_name
 }
 
@@ -124,6 +125,9 @@ module "bedrock_agent" {
   knowledge_base_id  = module.knowledge_base.knowledge_base_id
   knowledge_base_arn = module.knowledge_base.knowledge_base_arn
 
+  guardrail_id      = module.guardrails.guardrail_id
+  guardrail_version = module.guardrails.guardrail_version
+
   action_groups = {
     ops_actions = {
       lambda_arn     = module.lambda_functions["ops_get_service_info"].function_arn
@@ -132,5 +136,12 @@ module "bedrock_agent" {
     }
   }
 
-  depends_on = [module.lambda_functions, module.knowledge_base]
+  depends_on = [module.lambda_functions, module.knowledge_base, module.guardrails]
+}
+
+module "guardrails" {
+  source = "../../modules/bedrock-guardrails"
+
+  environment = var.env
+  app_id      = var.app_id
 }
