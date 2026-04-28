@@ -145,3 +145,31 @@ module "guardrails" {
   environment = var.env
   app_id      = var.app_id
 }
+
+module "invoke_agent_lambda" {
+  source = "../../modules/lambda_function"
+
+  environment  = var.env
+  app_id       = var.app_id
+  lambda_name  = "invoke-agent"
+  source_dir   = "${path.module}/../../src/lambda_functions/invoke_agent"
+  handler_file = "invoke_agent.lambda_handler"
+  runtime      = "python3.11"
+  timeout      = 120
+
+  environment_vars = {
+    REGION   = var.region
+    AGENT_ID = module.bedrock_agent.agent_id
+    ALIAS_ID = module.bedrock_agent.agent_alias_id
+  }
+
+  iam_policy_statements = [
+    {
+      Effect   = "Allow"
+      Action   = ["bedrock:InvokeAgent"]
+      Resource = module.bedrock_agent.agent_alias_arn
+    }
+  ]
+
+  depends_on = [module.bedrock_agent]
+}

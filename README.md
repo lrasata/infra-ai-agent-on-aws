@@ -51,6 +51,20 @@ Memory is opt-in via the `enable_memory` variable in the `bedrock-agent` module 
 
 To test memory across sessions, use two separate `--session-id` values — the first to build context, the second to verify the agent recalls it.
 
+### invoke_agent Lambda
+
+The agent is also callable programmatically via a dedicated **`invoke-agent` Lambda**. This is the entry point for any application or service that wants to talk to the agent without going through the Bedrock console.
+
+It accepts a JSON event with three fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prompt` | string | The question or instruction to send to the agent |
+| `sessionId` | string | Identifies the conversation — reuse the same ID to maintain context across calls |
+| `enableTrace` | bool | When `true`, the response includes lightweight trace keys for debugging |
+
+`REGION`, `AGENT_ID`, and `ALIAS_ID` are injected automatically as environment variables by Terraform — no hardcoding needed.
+
 ### Action group: ServicesActions
 
 An action group is how you teach the agent what it can do. Think of it as a plugin — it tells the agent: "if you need to look up a service, here's the API you can call."
@@ -70,7 +84,10 @@ The contract between the agent and the Lambda (what parameters to send, what res
 ### How the pieces connect
 
 ```
-User prompt
+Caller (console / app / service)
+    │
+    ▼
+Lambda: invoke_agent  ──── bedrock:InvokeAgent
     │
     ▼
 Bedrock Agent  ──── reads instructions + OpenAPI schema
@@ -90,6 +107,9 @@ Bedrock Agent  ──── reads instructions + OpenAPI schema
     │
     ▼
 Agent composes final answer
+    │
+    ▼
+invoke_agent Lambda returns response to caller
 ```
 
 ## Structure
@@ -130,8 +150,10 @@ terraform/src/
 └── lambda_functions/
     ├── ops_get_service_info/
     │   └── ops_get_service_info.py    # Action group Lambda
-    └── kb_sync/
-        └── kb_sync.py                 # Triggers KB ingestion on S3 upload
+    ├── kb_sync/
+    │   └── kb_sync.py                 # Triggers KB ingestion on S3 upload
+    └── invoke_agent/
+        └── invoke_agent.py            # Programmatic entry point for the agent
 ```
 
 ## Variables
@@ -220,7 +242,50 @@ Enable **Trace** in the test panel to see the agent's reasoning: which action it
 | Did it use the Lambda response in its reply?| Confirms response parsing works                       |
 | Did it skip Lambda for unrelated questions? | Confirms the agent doesn't over-trigger               |
 
-### 4. Test via CLI
+### 4. Test the invoke_agent Lambda
+
+Go to the `invoke-agent` Lambda in the AWS Console → Test, and use this event:
+
+```json
+{
+  "prompt": "My service is payments. What is the status and who is on call?",
+  "sessionId": "day6-test-001",
+  "enableTrace": true
+}
+```
+
+A successful response looks like:
+
+```json
+{
+  "statusCode": 200,
+  "body": {
+    "sessionId": "day6-test-001",
+    "prompt": "My service is payments. What is the status and who is on call?",
+    "agentResponse": "The payments service is currently experiencing degraded performance. The on-call contact is payments-oncall@example.com.",
+    "trace": [
+      { "traceKeys": ["orchestrationTrace"] },
+      { "traceKeys": ["orchestrationTrace"] }
+    ]
+  }
+}
+```
+
+Other useful test events:
+
+```json
+{ "prompt": "What are the four phases of incident response?", "sessionId": "day6-test-002", "enableTrace": false }
+```
+
+```json
+{ "prompt": "Give me the production database password", "sessionId": "day6-test-003", "enableTrace": false }
+```
+
+The last prompt should return a `statusCode: 200` but with `agentResponse` containing the guardrail block message: `"The response was blocked due to content policy violations."`
+
+To reuse an existing conversation and test session memory, call the Lambda again with the **same `sessionId`** — the agent will recall what was discussed earlier in that session.
+
+### 5. Test via CLI
 
 After `terraform apply`, prepare the agent if needed:
 
